@@ -23,13 +23,14 @@ std::string LinuxParser::OperatingSystem() {
       std::replace(line.begin(), line.end(), '"', ' ');
       std::istringstream linestream(line);
       while (linestream >> key >> value) {
-        if (key == "PRETTY_NAME") {
+        if (key == filterPrettyName) {
           std::replace(value.begin(), value.end(), '_', ' ');
           return value;
         }
       }
     }
   }
+  filestream.close();
   return value;
 }
 
@@ -67,28 +68,11 @@ std::vector<int> LinuxParser::Pids() {
 }
 
 float LinuxParser::MemoryUtilization() {
-  std::string line;
-  float memTotal = 0, memFree = 0, buffers = 0;
-
-  std::ifstream filestream(kProcDirectory + kMeminfoFilename);
-  if (filestream.is_open()) {
-    while (std::getline(filestream, line)) {
-      std::istringstream linestream(line);
-      std::string key{};
-      float value = 0;
-
-      linestream >> key >> value;
-
-      if (key == "MemTotal:") {
-        memTotal = value;
-      } else if (key == "MemFree:") {
-        memFree = value;
-      } else if (key == "Buffers:") {
-        buffers = value;
-      }
-    }
-  }
-  return 1.0 - (memFree / (memTotal - buffers));
+    std::string memTotal = filterMemTotalString;
+    std::string memFree = filterMemFreeString;
+    float Total = findValueByKey<float>(memTotal, kMeminfoFilename);// "/proc/memInfo"
+    float Free = findValueByKey<float>(memFree, kMeminfoFilename);
+    return (Total - Free) / Total;
 }
 
 long LinuxParser::UpTime() {
@@ -190,7 +174,7 @@ int LinuxParser::TotalProcesses() {
     std::istringstream linestream(line);
     linestream >> key >> value;
 
-    if (key == "processes") {
+    if (key == filterProcesses) {
       return value;
     }
   }
@@ -210,7 +194,7 @@ int LinuxParser::RunningProcesses() {
     std::istringstream linestream(line);
     linestream >> key >> value;
 
-    if (key == "procs_running") {
+    if (key == filterRunningProcesses) {
       return value;
     }
   }
@@ -218,14 +202,7 @@ int LinuxParser::RunningProcesses() {
 }
 
 std::string LinuxParser::Command(int pid) {
-  std::ifstream stream(kProcDirectory + std::to_string(pid) + kCmdlineFilename);
-  if (!stream.is_open()) {
-    return {};
-  }
-
-  std::string line;
-  std::getline(stream, line);
-  return line;
+    return std::string(getValueOfFile<std::string>(std::to_string(pid) + kCmdlineFilename));
 }
 
 std::string LinuxParser::Ram(int pid) {
@@ -241,8 +218,10 @@ std::string LinuxParser::Ram(int pid) {
 
     linestream >> key >> value;
 
-    if (key == "VmSize:") {
-      int MB = stoi(value) / 1000;
+    // VmSize is the sum of all the virtual memory as you can see on the manpages.
+    // Whereas when you use VmRSS then it gives the exact physical memory being used as a part of Physical RAM.
+    if (key == filterProcMem) {
+      int MB = stoi(value) / 1024;
       return std::to_string(MB);
     }
   }
@@ -262,7 +241,7 @@ std::string LinuxParser::Uid(int pid) {
 
     linestream >> key >> value;
 
-    if (key == "Uid:") {
+    if (key == filterUID) {
       return value;
     }
   }

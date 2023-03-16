@@ -21,11 +21,13 @@ Processor& System::Cpu() {
 
 vector<Process>& System::Processes() {
   processes_.clear();
-  std::vector<int> pids = LinuxParser::Pids();
 
-  for (auto x : pids) {
-    processes_.emplace_back(Process(x));
+  const vector < int > & pids = LinuxParser::Pids();
+  for (const int & pid: pids) {
+      Process process(pid);
+      processes_.emplace_back(process);
   }
+
   std::sort(processes_.begin(),
             processes_.end(),
             [](Process & a, Process & b){
